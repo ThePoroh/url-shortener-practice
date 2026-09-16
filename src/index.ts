@@ -5,6 +5,9 @@ import { UAParser } from 'ua-parser-js';
 import { PrismaClient } from '@prisma/client';
 
 const app = express();
+// Довіра заголовкам проксі Render (x-forwarded-proto, x-forwarded-host)
+app.set('trust proxy', 1);
+
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3000;
 
@@ -32,9 +35,14 @@ app.post('/api/links', async (req: Request, res: Response) => {
       data: { code, originalUrl }
     });
 
+    // Динамічне визначення протоколу (https на Render або http локально) і домену
+    const host = req.get('host');
+    const protocol = (req.headers['x-forwarded-proto'] as string) || req.protocol;
+    const baseUrl = `${protocol}://${host}`;
+
     return res.status(201).json({
       code: link.code,
-      shortUrl: `http://localhost:${PORT}/go/${link.code}`,
+      shortUrl: `${baseUrl}/go/${link.code}`,
       originalUrl: link.originalUrl
     });
   } catch (error) {
@@ -119,7 +127,7 @@ app.get('/api/links/:code/stats', async (req: Request, res: Response) => {
   }
 });
 
-// Обов'язковий рядок запуску сервера:
+// Запуск сервера
 app.listen(PORT, () => {
-  console.log(`🚀 Сервер успішно запущено: http://localhost:${PORT}`);
+  console.log(`🚀 Сервер успішно запущено на порту ${PORT}`);
 });
