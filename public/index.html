@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>URL Shortener & Analytics Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --text: #f8fafc;
+      --text-dim: #94a3b8;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --border: #334155;
+      --success: #10b981;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 40px 20px; min-height: 100vh; display: flex; flex-direction: column; align-items: center; }
+    header { margin-bottom: 30px; text-align: center; }
+    header h1 { font-size: 28px; margin-bottom: 8px; }
+    header p { color: var(--text-dim); }
+    .container { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 1100px; width: 100%; }
+    @media (max-width: 850px) { .container { grid-template-columns: 1fr; } }
+    .card { background-color: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2); display: flex; flex-direction: column; }
+    .card h2 { font-size: 20px; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 13px; color: var(--text-dim); margin-bottom: 6px; }
+    input { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: #0f172a; color: var(--text); font-size: 14px; outline: none; }
+    input:focus { border-color: var(--accent); }
+    button { background: var(--accent); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: background 0.2s; width: 100%; }
+    button:hover { background: var(--accent-hover); }
+    .result-box { margin-top: 20px; padding: 16px; border-radius: 8px; background: #0f172a; border: 1px dashed var(--border); display: none; text-align: center; }
+    .link-row { display: flex; gap: 8px; margin-bottom: 16px; }
+    .link-row input { text-align: center; font-weight: bold; color: var(--success); }
+    .link-row button { width: auto; padding: 0 16px; }
+    #qrcode { display: flex; justify-content: center; margin-top: 10px; padding: 10px; background: white; border-radius: 8px; width: fit-content; margin-left: auto; margin-right: auto; }
+    .stats-summary { display: flex; gap: 16px; margin-bottom: 20px; }
+    .stat-badge { flex: 1; background: #0f172a; padding: 12px; border-radius: 8px; text-align: center; border: 1px solid var(--border); }
+    .stat-badge span { display: block; font-size: 24px; font-weight: bold; color: var(--accent); }
+    .stat-badge small { color: var(--text-dim); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+    th, td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
+    th { color: var(--text-dim); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>URL Shortener & Analytics</h1>
+    <p>Практична реалізація сервісу скорочення посилань та аналітики кліків</p>
+  </header>
+
+  <div class="container">
+    <!-- ВІКНО 1: Скорочення та QR -->
+    <div class="card">
+      <h2>1. Скорочення посилання</h2>
+      <div class="form-group">
+        <label for="longUrl">Повний URL (включно з https://):</label>
+        <input type="url" id="longUrl" placeholder="https://example.com/very/long/path" required />
+      </div>
+      <div class="form-group">
+        <label for="customCode">Кастомний аліас (необов'язково):</label>
+        <input type="text" id="customCode" placeholder="promo2026" />
+      </div>
+      <button onclick="createShortLink()">Скоротити URL</button>
+
+      <div class="result-box" id="resultBox">
+        <label>Готове посилання:</label>
+        <div class="link-row">
+          <input type="text" id="shortUrlOutput" readonly />
+          <button onclick="copyLink()">Копіювати</button>
+        </div>
+        <div id="qrcode"></div>
+      </div>
+    </div>
+
+    <!-- ВІКНО 2: Аналітика -->
+    <div class="card">
+      <h2>2. Статистика переходів</h2>
+      <div class="form-group">
+        <label for="statsCode">Введіть код посилання:</label>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="statsCode" placeholder="AXxflH" />
+          <button style="width: 120px;" onclick="fetchStats()">Показати</button>
+        </div>
+      </div>
+
+      <div class="stats-summary" id="statsSummary" style="display: none;">
+        <div class="stat-badge">
+          <span id="statTotal">0</span>
+          <small>Усього кліків</small>
+        </div>
+        <div class="stat-badge">
+          <span id="statDesktop">0</span>
+          <small>Desktop</small>
+        </div>
+        <div class="stat-badge">
+          <span id="statMobile">0</span>
+          <small>Mobile</small>
+        </div>
+      </div>
+
+      <div id="tableWrapper" style="display: none; overflow-x: auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Час</th>
+              <th>ОС</th>
+              <th>Браузер</th>
+              <th>Тип</th>
+            </tr>
+          </thead>
+          <tbody id="clicksTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let qr = null;
+
+    async function createShortLink() {
+      const originalUrl = document.getElementById('longUrl').value.trim();
+      const customCode = document.getElementById('customCode').value.trim();
+      if (!originalUrl) return alert('Вкажіть посилання!');
+
+      try {
+        const res = await fetch('/api/links', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ originalUrl, customCode: customCode || undefined })
+        });
+        const data = await res.json();
+        if (!res.ok) return alert(data.error || 'Помилка створення');
+
+        document.getElementById('shortUrlOutput').value = data.shortUrl;
+        document.getElementById('resultBox').style.display = 'block';
+
+        // Генерація QR
+        const qrContainer = document.getElementById('qrcode');
+        qrContainer.innerHTML = '';
+        qr = new QRCode(qrContainer, {
+          text: data.shortUrl,
+          width: 130,
+          height: 130
+        });
+
+        // Автопідстановка у вікно статистики
+        document.getElementById('statsCode').value = data.code;
+        fetchStats();
+      } catch (err) {
+        alert('Не вдалося зʼєднатися із сервером');
+      }
+    }
+
+    function copyLink() {
+      const copyText = document.getElementById('shortUrlOutput');
+      copyText.select();
+      navigator.clipboard.writeText(copyText.value);
+      alert('Скопійовано!');
+    }
+
+async function fetchStats() {
+  const code = document.getElementById('statsCode').value.trim();
+  if (!code) return;
+
+  try {
+    // Додаємо ?t=Date.now() та cache: 'no-store', щоб браузер ніколи не брав дані з кешу
+    const res = await fetch(`/api/links/${code}/stats?t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: {
+        'Pragma': 'no-cache',
+        'Cache-Control': 'no-cache'
+      }
+    });
+
+    const data = await res.json();
+    if (!res.ok) return alert(data.error || 'Не знайдено');
+
+    document.getElementById('statsSummary').style.display = 'flex';
+    document.getElementById('tableWrapper').style.display = 'block';
+
+    document.getElementById('statTotal').innerText = data.totalClicks;
+    document.getElementById('statDesktop').innerText = data.devices.desktop || 0;
+    document.getElementById('statMobile').innerText = data.devices.mobile || 0;
+
+    const tbody = document.getElementById('clicksTableBody');
+    tbody.innerHTML = '';
+    data.recentClicks.forEach(c => {
+      const row = `<tr>
+        <td>${new Date(c.createdAt).toLocaleTimeString()}</td>
+        <td>${c.os || '-'}</td>
+        <td>${c.browser || '-'}</td>
+        <td>${c.device || 'desktop'}</td>
+      </tr>`;
+      tbody.innerHTML += row;
+    });
+  } catch (err) {
+    console.error('Помилка завантаження статистики:', err);
+  }
+}
+  </script>
+</body>
+</html>
