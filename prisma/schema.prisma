@@ -11,6 +11,7 @@ model Link {
   id          String   @id @default(uuid())
   code        String   @unique
   originalUrl String
+  maxClicks   Int?     
   createdAt   DateTime @default(now())
   clicks      Click[]
 }
