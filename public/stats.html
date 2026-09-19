@@ -202,38 +202,56 @@
   }
 
   function renderCharts(data) {
-    // 1. Лінійний графік
-    const timeLabels = Object.keys(data.timeline || {});
-    const timeValues = Object.values(data.timeline || {});
+    // 1. Погодинна активність (стовпчиковий графік для коректного показу невеликої кількості кліків)
+    const rawTimeline = data.timeline || {};
+    const timeLabels = Object.keys(rawTimeline);
+    const timeValues = Object.values(rawTimeline);
 
     const ctxTime = document.getElementById('timelineChart').getContext('2d');
     if (timelineChartInstance) timelineChartInstance.destroy();
     
     timelineChartInstance = new Chart(ctxTime, {
-      type: 'line',
+      type: 'bar',
       data: {
         labels: timeLabels.length ? timeLabels : ['Немає даних'],
         datasets: [{
           label: 'Кліки',
           data: timeValues.length ? timeValues : [0],
-          borderColor: '#6366f1',
-          backgroundColor: 'rgba(99, 102, 241, 0.2)',
-          fill: true,
-          tension: 0.35
+          backgroundColor: '#6366f1',
+          borderRadius: 6,
+          maxBarThickness: 36
         }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        plugins: { 
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ` Переходів: ${ctx.raw}`
+            }
+          }
+        },
         scales: {
-          x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af' } },
-          y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { stepSize: 1, color: '#9ca3af' } }
+          x: { 
+            grid: { color: 'rgba(255,255,255,0.05)' }, 
+            ticks: { color: '#9ca3af' } 
+          },
+          y: { 
+            beginAtZero: true,
+            grid: { color: 'rgba(255,255,255,0.05)' }, 
+            ticks: { 
+              stepSize: 1, 
+              precision: 0,
+              color: '#9ca3af' 
+            } 
+          }
         }
       }
     });
 
-    // 2. Кругова діаграма
+    // 2. Кругова діаграма девайсів
     const deviceLabels = Object.keys(data.devices || {});
     const deviceValues = Object.values(data.devices || {});
 
